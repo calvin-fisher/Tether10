@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace TetherWindows
@@ -146,16 +147,12 @@ namespace TetherWindows
                                     }
                                     if (line.StartsWith("STATUS: "))
                                         this.status.Text = line.Substring("STATUS: ".Length);
-                                    TextBox textBox = this.nodeLog;
-                                    string str = textBox.Text + line + "\r\n";
-                                    textBox.Text = str;
-                                    if (this.nodeLog.Text.Length > 20000)
-                                        this.nodeLog.Text = this.nodeLog.Text.Substring(20000);
-                                    this.nodeLog.SelectionStart = this.nodeLog.Text.Length;
-                                    this.nodeLog.ScrollToCaret();
+
+                                    LogMessage(line);
                                 }
                                 catch (Exception ex)
                                 {
+                                    LogMessage(ex.ToString());
                                 }
                             });
                             line = string.Empty;
@@ -163,7 +160,7 @@ namespace TetherWindows
                         }
                         continue;
                     default:
-                        line += (string)(object)(char)num;
+                        line += (char)num;
                         continue;
                 }
             }
@@ -176,6 +173,23 @@ namespace TetherWindows
             this.toggleButton.Text = "Start";
         }
 
+        private void LogMessage(string message)
+        { 
+            this.Invoke((Action)delegate
+            { 
+                this.nodeLog.AppendText(message); 
+                this.nodeLog.AppendText("\r\n"); 
+
+
+                if (this.nodeLog.Text.Length > 20000) 
+                    this.nodeLog.Text = this.nodeLog.Text.Substring(20000); 
+
+
+                this.nodeLog.SelectionStart = this.nodeLog.Text.Length; 
+                this.nodeLog.ScrollToCaret(); 
+            }); 
+        }
+
         private void toggleButton_Click(object sender, EventArgs e)
         {
             if (this.nodeProcess != null)
@@ -186,8 +200,8 @@ namespace TetherWindows
             else
             {
                 this.toggleButton.Text = "Stop";
-                string networkName = TetherForm.GetNetworkHumanName(TetherForm.GetDeviceGuid());
-                new Thread((ThreadStart)(() =>
+                var networkName = TetherForm.GetNetworkHumanName(TetherForm.GetDeviceGuid());
+                Task.Run(() =>
                 {
                     var executablePath = Path.GetDirectoryName(Application.ExecutablePath);
                     ProcessStartInfo startInfo = new ProcessStartInfo
@@ -208,7 +222,7 @@ namespace TetherWindows
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        LogMessage(ex.ToString());
                     }
                     finally
                     {
@@ -222,10 +236,11 @@ namespace TetherWindows
                                 }
                                 catch (Exception ex)
                                 {
+                                    LogMessage(ex.ToString());
                                 }
                             });
                     }
-                })).Start();
+                });
             }
         }
 
