@@ -104,65 +104,56 @@ namespace TetherWindows
 
         private void PumpProcess(Process process)
         {
-            string line = string.Empty;
-            while (!process.HasExited)
+            try
             {
-                process.StandardInput.WriteLine("noop");
-                int num = process.StandardOutput.Read();
-                switch (num)
+                while (this.IsHandleCreated)
                 {
-                    case -1:
-                        return;
-                    case 13:
-                    case 10:
-                        if (!(line == string.Empty))
-                        {
-                            if (!this.IsHandleCreated)
-                                return;
-                            this.Invoke((Action)delegate
-                            {
-                                try
-                                {
-                                    if (string.IsNullOrEmpty(line))
-                                        return;
-                                    if (line.Contains("STATUS: Phone not detected by adb."))
-                                    {
-                                        this.statusImage.Image = (Image)Resources.usb_broken;
-                                        this.icon.Icon = Icon.FromHandle(((Bitmap)this.statusImage.Image).GetHicon());
-                                    }
-                                    else if (line.Contains("STATUS: Tether has connected."))
-                                    {
-                                        this.statusImage.Image = (Image)Resources.usb_on;
-                                        this.icon.Icon = Icon.FromHandle(((Bitmap)this.statusImage.Image).GetHicon());
-                                    }
-                                    else if (line.Contains("STATUS: Tether has disconnected."))
-                                    {
-                                        this.statusImage.Image = (Image)Resources.usb_pending;
-                                        this.icon.Icon = Icon.FromHandle(((Bitmap)this.statusImage.Image).GetHicon());
-                                    }
-                                    else if (line.Contains("STATUS: Connected to phone. Waiting for tether connection."))
-                                    {
-                                        this.statusImage.Image = (Image)Resources.usb_pending;
-                                        this.icon.Icon = Icon.FromHandle(((Bitmap)this.statusImage.Image).GetHicon());
-                                    }
-                                    if (line.StartsWith("STATUS: "))
-                                        this.status.Text = line.Substring("STATUS: ".Length);
+                    var line = process.StandardOutput.ReadLine();
 
-                                    LogMessage(line);
-                                }
-                                catch (Exception ex)
-                                {
-                                    LogMessage(ex.ToString());
-                                }
-                            });
-                            line = string.Empty;
-                            continue;
+                    if (line == null)
+                        break;
+
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    try
+                    {
+                        if (line.Contains("STATUS: Phone not detected by adb."))
+                        {
+                            this.statusImage.Image = (Image) Resources.usb_broken;
+                            this.icon.Icon = Icon.FromHandle(((Bitmap) this.statusImage.Image).GetHicon());
                         }
-                        continue;
-                    default:
-                        line += (char)num;
-                        continue;
+                        else if (line.Contains("STATUS: Tether has connected."))
+                        {
+                            this.statusImage.Image = (Image) Resources.usb_on;
+                            this.icon.Icon = Icon.FromHandle(((Bitmap) this.statusImage.Image).GetHicon());
+                        }
+                        else if (line.Contains("STATUS: Tether has disconnected."))
+                        {
+                            this.statusImage.Image = (Image) Resources.usb_pending;
+                            this.icon.Icon = Icon.FromHandle(((Bitmap) this.statusImage.Image).GetHicon());
+                        }
+                        else if (line.Contains("STATUS: Connected to phone. Waiting for tether connection."))
+                        {
+                            this.statusImage.Image = (Image) Resources.usb_pending;
+                            this.icon.Icon =
+                                Icon.FromHandle(((Bitmap) this.statusImage.Image).GetHicon());
+                        }
+                        if (line.StartsWith("STATUS: "))
+                            this.status.Text = line.Substring("STATUS: ".Length);
+
+                        LogMessage(line);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage(ex.ToString());
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                LogMessage(ex.ToString());
             }
         }
 
