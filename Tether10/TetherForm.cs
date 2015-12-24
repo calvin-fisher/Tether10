@@ -10,6 +10,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace TetherWindows
@@ -144,14 +145,15 @@ namespace TetherWindows
                                         this.icon.Icon = Icon.FromHandle(((Bitmap)this.statusImage.Image).GetHicon());
                                     }
                                     if (line.StartsWith("STATUS: "))
+                                    {
                                         this.status.Text = line.Substring("STATUS: ".Length);
+                                    }
+
+                                    LogProgress(line);
                                     TextBox textBox = this.nodeLog;
                                     string str = textBox.Text + line + "\r\n";
                                     textBox.Text = str;
-                                    if (this.nodeLog.Text.Length > 20000)
-                                        this.nodeLog.Text = this.nodeLog.Text.Substring(20000);
-                                    this.nodeLog.SelectionStart = this.nodeLog.Text.Length;
-                                    this.nodeLog.ScrollToCaret();
+                                    
                                 }
                                 catch (Exception ex)
                                 {
@@ -175,7 +177,39 @@ namespace TetherWindows
             this.toggleButton.Text = "Start";
         }
 
-        private void toggleButton_Click(object sender, EventArgs e)
+        private void LogProgress(string message)
+        {
+            this.Invoke((Action)delegate 
+            {
+                this.nodeLog.AppendText(message);
+                this.nodeLog.AppendText("\r\n");
+
+                if (this.nodeLog.Text.Length > 20000)
+                    this.nodeLog.Text = this.nodeLog.Text.Substring(20000);
+
+                this.nodeLog.SelectionStart = this.nodeLog.Text.Length;
+                this.nodeLog.ScrollToCaret();
+            });
+        }
+
+        private void StartNodeProcess()
+        {
+            string networkName = TetherForm.GetNetworkHumanName(TetherForm.GetDeviceGuid());
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true;
+            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            startInfo.RedirectStandardOutput = true;
+            startInfo.RedirectStandardInput = true;
+            if (Environment.OSVersion.Version.Major < 6)
+                startInfo.EnvironmentVariables["NO_TUNWORKER"] = "true";
+            startInfo.FileName = "win32\\run.bat";
+            startInfo.Arguments = "\"" + networkName + "\"";
+            this.nodeProcess = Process.Start(startInfo);
+            this.PumpProcess(this.nodeProcess);
+        }
+
+        private async void toggleButton_Click(object sender, EventArgs e)
         {
             if (this.nodeProcess != null)
             {
@@ -186,43 +220,27 @@ namespace TetherWindows
             {
                 this.toggleButton.Text = "Stop";
                 string networkName = TetherForm.GetNetworkHumanName(TetherForm.GetDeviceGuid());
-                new Thread((ThreadStart)(() =>
+
+                try
                 {
-                    ProcessStartInfo startInfo = new ProcessStartInfo();
-                    startInfo.UseShellExecute = false;
-                    startInfo.CreateNoWindow = true;
-                    startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                    startInfo.RedirectStandardOutput = true;
-                    startInfo.RedirectStandardInput = true;
-                    if (Environment.OSVersion.Version.Major < 6)
-                        startInfo.EnvironmentVariables["NO_TUNWORKER"] = "true";
-                    startInfo.FileName = "win32\\run.bat";
-                    startInfo.Arguments = "\"" + networkName + "\"";
-                    try
-                    {
-                        this.nodeProcess = Process.Start(startInfo);
-                        this.PumpProcess(this.nodeProcess);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
-                    finally
-                    {
-                        this.KillIt();
-                        if (this.IsHandleCreated)
-                            this.BeginInvoke((Action)delegate
+                    await Script.Run(new Progress<string>(LogProgress));
+
+                    StartNodeProcess();
+                }
+                finally
+                {
+                    this.KillIt();
+                    if (this.IsHandleCreated)
+                        this.BeginInvoke((Action)delegate
+                        {
+                            try
                             {
-                                try
-                                {
-                                    this.StopIt();
-                                }
-                                catch (Exception ex)
-                                {
-                                }
-                            });
-                    }
-                })).Start();
+                                this.StopIt();
+                            }
+                            catch
+                            {}
+                        });
+                }
             }
         }
 
