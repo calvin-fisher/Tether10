@@ -9,6 +9,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -188,16 +189,18 @@ namespace TetherWindows
                 string networkName = TetherForm.GetNetworkHumanName(TetherForm.GetDeviceGuid());
                 new Thread((ThreadStart)(() =>
                 {
-                    ProcessStartInfo startInfo = new ProcessStartInfo();
-                    startInfo.UseShellExecute = false;
-                    startInfo.CreateNoWindow = true;
-                    startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                    startInfo.RedirectStandardOutput = true;
-                    startInfo.RedirectStandardInput = true;
-                    if (Environment.OSVersion.Version.Major < 6)
-                        startInfo.EnvironmentVariables["NO_TUNWORKER"] = "true";
-                    startInfo.FileName = "win32\\run.bat";
-                    startInfo.Arguments = "\"" + networkName + "\"";
+                    var executablePath = Path.GetDirectoryName(Application.ExecutablePath);
+                    ProcessStartInfo startInfo = new ProcessStartInfo
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        RedirectStandardOutput = true,
+                        RedirectStandardInput = true,
+                        FileName = Path.Combine(executablePath, "win32\\run.bat"),
+                        Arguments = "\"" + networkName + "\""
+                    };
+
                     try
                     {
                         this.nodeProcess = Process.Start(startInfo);
